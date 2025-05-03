@@ -18,6 +18,7 @@
 #include <signal.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -62,6 +63,7 @@ using ::privacy_sandbox::server_common::byob::LoadBinaryResponse;
 
 constexpr absl::Duration kWorkerCreationTimeout = absl::Seconds(10);
 const std::filesystem::path kBinaryExe = "bin.exe";
+const std::filesystem::path kBinaryZip = "bin.zip";
 
 absl::StatusOr<std::string> Read(int fd, int size) {
   std::string buffer(size, '\0');
@@ -85,15 +87,39 @@ absl::StatusOr<std::filesystem::path> CopyBinaryForLoad(
       binary_dir / code_token));
   std::filesystem::path binary_relative_path = code_token / kBinaryExe;
   std::filesystem::path binary_full_path = binary_dir / binary_relative_path;
+  std::filesystem::path zip_relative_path = code_token / kBinaryZip;
+  std::filesystem::path zip_full_path = binary_dir / zip_relative_path;
+
+  LOG(INFO) << "CopyBinaryForLoad: " << user_provided_binary_path <<
+    " -->" << zip_full_path << std::endl;
 
   std::error_code ec;
-  if (std::filesystem::copy(user_provided_binary_path, binary_full_path,
+  if (std::filesystem::copy(user_provided_binary_path, zip_full_path,
                             std::filesystem::copy_options::none, ec);
       ec) {
     return absl::InternalError(absl::StrCat(
         "Failed to copy binary from ", user_provided_binary_path.native(),
-        " to ", binary_full_path.native(), ": ", ec.message()));
+        " to ", zip_full_path.native(), ": ", ec.message()));
   }
+
+  std::filesystem::path target_dir = binary_dir / code_token;
+  const char* argv[] = {
+      "/busybox/unzip",
+      // args
+      zip_full_path.c_str(),
+      "-d",
+      target_dir.c_str(),
+      // end args
+      nullptr,
+  };
+  const int pid = ::vfork();
+  if (pid == 0) {
+    ::execve(argv[0], const_cast<char* const*>(&argv[0]),
+             /*envp=*/nullptr);
+    PLOG(FATAL) << "execve()";
+  }
+  ::waitpid(pid, nullptr, /*options=*/0);
+
   if (std::filesystem::permissions(binary_full_path.parent_path(),
                                    std::filesystem::perms::owner_all |
                                        std::filesystem::perms::owner_all |

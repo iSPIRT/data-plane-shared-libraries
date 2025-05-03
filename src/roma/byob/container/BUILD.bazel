@@ -180,6 +180,7 @@ cc_binary(
         "//src/roma/byob/utility:utils",
         "//src/util/status_macro:status_macros",
         "//src/util/status_macro:status_util",
+        "//src/core/common/uuid",
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_absl//absl/cleanup",
         "@com_google_absl//absl/container:flat_hash_map",
@@ -270,7 +271,7 @@ else
 fi
 cp --dereference \
   "$${{ROOT_DIR}}/usr/lib/$${{MACHINE}}-linux-gnu"/libstdc++.so.6 \
-  "$${{ROOT_DIR}}/lib/$${{MACHINE}}-linux-gnu"/{{libc.so.6,libgcc_s.so.1,libm.so.6,libpthread.so.0}} \
+  "$${{ROOT_DIR}}/lib/$${{MACHINE}}-linux-gnu"/{{libc.so.6,libgcc_s.so.1,libm.so.6,libpthread.so.0,libdl.so.2,libutil.so.1}} \
   "$${{TARGET_DIR}}"
 rm -rf "$${{ROOT_DIR}}/usr/lib"
 if [[ -d $${{ROOT_DIR}}/lib64 ]]; then
